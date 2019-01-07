@@ -10,6 +10,7 @@ from explorer import app_settings
 from explorer.exporters import get_exporter_class
 from explorer.models import Query, QueryLog, FTPExport
 
+
 if app_settings.ENABLE_TASKS:
     from celery import task
     from celery.utils.log import get_task_logger
@@ -72,7 +73,6 @@ def truncate_querylogs(days):
 @task
 def snapshot_query_on_bucket(query_id):
     try:
-        import time
         logger.info("Starting snapshot for query %s..." % query_id)
         q = Query.objects.get(pk=query_id)
         q_name = q.slug if q.slug else q.id
@@ -90,24 +90,3 @@ def snapshot_query_on_bucket(query_id):
     except Exception as e:
         logger.exception("Failed to snapshot query %s (%s)." % (query_id))
     return datetime.now()
-
-
-@task
-def snapshot_queries_on_bucket():
-    logger.info("Starting query snapshots...")
-    qs_bucket = Query.objects.exclude(bucket__exact='').annotate(query_id=F('id'),
-                                                                 query_priority=F('priority')).values(
-        'query_id',
-        'query_priority')
-    qs_ftp = FTPExport.objects.all().annotate(query_id=F('query__id'),
-                                              query_priority=F('query__priority')).values('query_id',
-                                                                                          'query_priority')
-    total_ids = list(qs_bucket) + list(qs_ftp)
-    mandatory_ids = {x["query_id"] for x in total_ids if x["query_priority"] is True}
-    not_mandatory_ids = {x["query_id"] for x in total_ids if x["query_priority"] is False}
-    logger.info("Found %s queries to snapshot. Creating snapshot tasks..." % len(total_ids))
-    high_priority_group = group([snapshot_query_on_bucket.s(qid) for qid in mandatory_ids])()
-    # this forces the first group to check for the result and until this function does not finish,
-    # the secondary group does not start.
-    high_priority_group.get()
-    group([snapshot_query_on_bucket.s(qid) for qid in not_mandatory_ids])()
