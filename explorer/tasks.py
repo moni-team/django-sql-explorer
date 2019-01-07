@@ -88,7 +88,7 @@ def snapshot_query_on_bucket(query_id):
             moni_s3_transfer_file_to_ftp(ftp_export, file_output, k, ftp_export.passive)
             time.sleep(2)
     except Exception as e:
-        logger.warning("Failed to snapshot query %s (%s)." % (query_id, e.message))
+        logger.exception("Failed to snapshot query %s (%s)." % (query_id, e.message))
     return datetime.now()
 
 
