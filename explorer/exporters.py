@@ -1,18 +1,20 @@
-from django.db import DatabaseError
-from django.core.serializers.json import DjangoJSONEncoder
+from datetime import datetime
 import json
+from six import StringIO, BytesIO
 import string
 import sys
-from datetime import datetime
+
+from django.core.serializers.json import DjangoJSONEncoder
+from django.db import DatabaseError
+from django.utils.module_loading import import_string
+from unidecode import unidecode
+
+from . import app_settings
 PY3 = sys.version_info[0] == 3
 if PY3:
     import csv
 else:
     import unicodecsv as csv
-
-from django.utils.module_loading import import_string
-from . import app_settings
-from six import StringIO, BytesIO
 
 
 def get_exporter_class(format):
@@ -79,7 +81,7 @@ class CSVExporter(BaseExporter):
 
         writer.writerow(res.headers)
         for row in res.data:
-            writer.writerow([s for s in row])
+            writer.writerow([unidecode(unicode(s)) for s in row])
         return csv_data
 
 
