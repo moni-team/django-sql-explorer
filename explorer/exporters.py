@@ -81,7 +81,7 @@ class CSVExporter(BaseExporter):
 
         writer.writerow(res.headers)
         for row in res.data:
-            writer.writerow([unidecode(unicode(s)) for s in row])
+            writer.writerow([unidecode(str(s)) for s in row])
         return csv_data
 
 
