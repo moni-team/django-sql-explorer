@@ -1,9 +1,9 @@
 from celery import group
 from celery.utils.log import get_task_logger
 from django.core.management.base import BaseCommand
-from django.db.models import F, Q
+from django.db.models import Q
 
-from explorer.models import Query, FTPExport
+from explorer.models import Query
 from explorer.tasks import snapshot_query_on_bucket
 
 
@@ -18,10 +18,16 @@ class Command(BaseCommand):
             Q(bucket__exact='') |
             Q(bucket__isnull=True)
         )
-        priority = queries.filter(priority=True).values_list('pk', flat=True)
-        no_priority = queries.filter(priority=False).values_list('pk', flat=True)
-        
-        group_priority = group([snapshot_query_on_bucket.s(pk) for pk in priority])
-        group_no_priority = group([snapshot_query_on_bucket.s(pk) for pk in no_priority])
+        priority = queries.filter(
+            priority=True).values_list('pk', flat=True)
+
+        no_priority = queries.filter(
+            priority=False).values_list('pk', flat=True)
+
+        group_priority = group(
+            [snapshot_query_on_bucket.s(pk) for pk in priority])
+
+        group_no_priority = group(
+            [snapshot_query_on_bucket.s(pk) for pk in no_priority])
         canvas = group_priority | group_no_priority
         canvas()
