@@ -191,7 +191,11 @@ def moni_s3_transfer_file_to_ftp(ftp_export, io_file, file_name, passive, compre
     :param io_file: the StringIO file
     :param file_name: the name of the StringIO file
     """
-    session = ftplib.FTP(ftp_export.host, ftp_export.user, ftp_export.password)
+    session = ftplib.FTP(
+        ftp_export.host,
+        ftp_export.user,
+        ftp_export.password,
+    )
     session.cwd(ftp_export.folder_path)  # move to correct directory
     if passive:
         session.set_pasv(0)

@@ -74,21 +74,11 @@ def truncate_querylogs(days):
 @celery_app.task(name="bulk.snapshot_query_on_bucket")
 def snapshot_query_on_bucket(query_id):
     try:
-        logger.info("Starting snapshot for query %s..." % query_id)
         q = Query.objects.get(pk=query_id)
         q_name = q.slug if q.slug else q.id
         exporter = get_exporter_class('csv')(q)
-        k = '%s-%s.csv' % (q_name, date.today().strftime('%Y%m%d'))
+        k = '{}-{}.csv'.format(q_name, date.today().strftime('%Y%m%d'))
         file_output = exporter.get_file_output(encoding=q.encoding)
-        if q.bucket != '':
-            logger.info(
-                "Uploading snapshot for query %s as %s..." % (query_id, k))
-
-            url = moni_s3_upload(k, file_output, q.bucket)
-
-            logger.info(
-                "Done uploading snapshot for query %s. URL: %s" % (query_id, url))
-
         # sends the file of the query via all the FTP exports
         for ftp_export in q.ftpexport_set.all():
             moni_s3_transfer_file_to_ftp(
@@ -99,5 +89,5 @@ def snapshot_query_on_bucket(query_id):
             )
             time.sleep(2)
     except Exception:
-        logger.exception("Failed to snapshot query %s (%s)." % (query_id))
+        logger.exception("Failed to snapshot query {}.".format(query_id))
     return datetime.now()
