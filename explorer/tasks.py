@@ -13,7 +13,6 @@ from explorer.models import Query, QueryLog
 from celery.utils.log import get_task_logger
 from explorer.utils import (
     s3_upload,
-    moni_s3_upload,
     moni_s3_transfer_file_to_ftp,
 )
 

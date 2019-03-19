@@ -1,8 +1,8 @@
 import ftplib
 import functools
-import io
 import re
 import zipfile
+from io import BytesIO
 
 from django.db import connections, connection
 
@@ -203,6 +203,6 @@ def moni_s3_transfer_file_to_ftp(ftp_export, io_file, file_name, passive, compre
     if compress:
         archive = zipfile.ZipFile(io_file, 'w', zipfile.ZIP_DEFLATED)
     else:
-        archive = io_file
+        archive = BytesIO(io_file.read().encode())
     session.storbinary('STOR {}'.format(file_name), archive)
     session.quit()
