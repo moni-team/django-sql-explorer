@@ -13,6 +13,7 @@ from explorer.models import Query, QueryLog
 from celery.utils.log import get_task_logger
 from explorer.utils import (
     s3_upload,
+    moni_s3_upload,
     moni_s3_transfer_file_to_ftp,
 )
 
@@ -87,6 +88,8 @@ def snapshot_query_on_bucket(query_id):
                 ftp_export.passive,
             )
             time.sleep(2)
+        if q.bucket != '':
+            moni_s3_upload(k, file_output, q.bucket)
     except Exception:
         logger.exception("Failed to snapshot query {}.".format(query_id))
     return datetime.now()
