@@ -20,7 +20,7 @@ setup(
     license="MIT",
     keywords="django sql explorer reports reporting csv database query",
     url="https://github.com/moni-team/django-sql-explorer",
-    packages=['moni-explorer'],
+    packages=['explorer'],
     long_description=read('README.rst'),
     classifiers=[
         'Framework :: Django :: 1.10',
