@@ -1,6 +1,5 @@
 import os
 from setuptools import setup
-from explorer import __version__
 
 # Utility function to read the README file.
 # Used for the long_description.  It's nice, because now 1) we have a top level
@@ -12,30 +11,19 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 setup(
-    name="django-sql-explorer",
-    version=__version__,
+    name="django-sql-explorer-moni",
+    version='moni_version',
     author="Chris Clark",
     author_email="chris@untrod.com",
     description=("A pluggable app that allows users (admins) to execute SQL,"
                  " view, and export the results."),
     license="MIT",
     keywords="django sql explorer reports reporting csv database query",
-    url="https://github.com/epantry/django-sql-explorer",
-    packages=['explorer'],
+    url="https://github.com/moni-team/django-sql-explorer",
+    packages=['moni-explorer'],
     long_description=read('README.rst'),
     classifiers=[
-        'Development Status :: 5 - Production/Stable',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: MIT License',
-        'Topic :: Utilities',
-        'Framework :: Django :: 1.7',
-        'Framework :: Django :: 1.8',
-        'Framework :: Django :: 1.9',
         'Framework :: Django :: 1.10',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
     ],
     install_requires=[
