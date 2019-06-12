@@ -4,10 +4,7 @@ from time import time
 import six
 
 from django.db import models, DatabaseError
-if django.VERSION[1] >= 10:
-    from django.urls import reverse
-else:
-    from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.conf import settings
 
 from . import app_settings
@@ -128,7 +125,7 @@ class SnapShot(object):
 
 
 class FTPExport(models.Model):
-    query = models.ForeignKey(Query)
+    query = models.ForeignKey(Query, on_delete=models.CASCADE)
     host = models.CharField(max_length=100)
     user = models.CharField(max_length=100)
     password = models.CharField(max_length=30)
