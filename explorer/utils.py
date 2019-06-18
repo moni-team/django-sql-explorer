@@ -52,7 +52,7 @@ def extract_params(text):
 
 # Helpers
 from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth.views import login
+from django.contrib.auth.views import LoginView
 from django.contrib.auth import REDIRECT_FIELD_NAME
 
 
@@ -66,7 +66,7 @@ def safe_login_prompt(request):
             REDIRECT_FIELD_NAME: request.get_full_path(),
         },
     }
-    return login(request, **defaults)
+    return LoginView.as_view(request, **defaults)
 
 
 def shared_dict_update(target, source):
