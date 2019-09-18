@@ -1,4 +1,3 @@
-import django
 import re
 import six
 from collections import Counter
@@ -42,8 +41,10 @@ from explorer import permissions
 class ExplorerContextMixin(object):
 
     def gen_ctx(self):
-        return {'can_view': app_settings.EXPLORER_PERMISSION_VIEW(self.request.user),
-                'can_change': app_settings.EXPLORER_PERMISSION_CHANGE(self.request.user)}
+        return {
+            'can_view': app_settings.EXPLORER_PERMISSION_VIEW(self.request.user),
+            'can_change': app_settings.EXPLORER_PERMISSION_CHANGE(self.request.user)
+        }
 
     def get_context_data(self, **kwargs):
         ctx = super(ExplorerContextMixin, self).get_context_data(**kwargs)

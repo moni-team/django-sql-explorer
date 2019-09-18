@@ -97,7 +97,7 @@ class Query(models.Model):
         return get_params_for_url(self)
 
     def log(self, user=None):
-        if user and user.is_anonymous():
+        if user and user.is_anonymous:
             user = None
         ql = QueryLog(sql=self.final_sql(), query_id=self.id, run_by_user=user)
         ql.save()
