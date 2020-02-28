@@ -25,9 +25,9 @@ class Command(BaseCommand):
             priority=False).values_list('pk', flat=True)
 
         group_priority = group(
-            [snapshot_query_on_bucket.s(pk) for pk in priority])
+            [snapshot_query_on_bucket.s(query_id=pk) for pk in priority])
 
         group_no_priority = group(
-            [snapshot_query_on_bucket.s(pk) for pk in no_priority])
+            [snapshot_query_on_bucket.s(query_id=pk) for pk in no_priority])
         canvas = group_priority | group_no_priority
         canvas()

@@ -72,7 +72,7 @@ def truncate_querylogs(days):
 
 
 @celery_app.task(name="bulk.snapshot_query_on_bucket")
-def snapshot_query_on_bucket(query_id):
+def snapshot_query_on_bucket(query_id=None, *args, **kwrgs):
     try:
         q = Query.objects.get(pk=query_id)
         q_name = q.slug if q.slug else q.id
