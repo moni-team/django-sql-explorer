@@ -18,8 +18,9 @@ class Command(BaseCommand):
             Q(bucket__exact='') |
             Q(bucket__isnull=True)
         ).order_by('id').distinct().values_list('pk', flat=True)
-
-        query_group = group(
-            [snapshot_query_on_bucket.s(query_id=pk) for pk queries]
-        )
-        query_group()
+        task_list = []
+        for query in queries:
+            task_list.append(snapshot_query_on_bucket.s(query_id=query.pk))
+        if task_list:
+            query_group = group(task_list)
+            query_group()
