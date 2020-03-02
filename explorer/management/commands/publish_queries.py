@@ -20,7 +20,7 @@ class Command(BaseCommand):
         ).order_by('id').distinct().values_list('pk', flat=True)
         task_list = []
         for query in queries:
-            task_list.append(snapshot_query_on_bucket.s(query_id=query.pk))
+            task_list.append(snapshot_query_on_bucket.s(query_id=query))
         if task_list:
             query_group = group(task_list)
             query_group()
