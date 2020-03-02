@@ -17,17 +17,9 @@ class Command(BaseCommand):
         queries = Query.objects.exclude(
             Q(bucket__exact='') |
             Q(bucket__isnull=True)
+        ).order_by('id').distinct().values_list('pk', flat=True)
+
+        query_group = group(
+            [snapshot_query_on_bucket.s(query_id=pk) for pk queries]
         )
-        priority = queries.filter(
-            priority=True).values_list('pk', flat=True)
-
-        no_priority = queries.filter(
-            priority=False).values_list('pk', flat=True)
-
-        group_priority = group(
-            [snapshot_query_on_bucket.s(query_id=pk) for pk in priority])
-
-        group_no_priority = group(
-            [snapshot_query_on_bucket.s(query_id=pk) for pk in no_priority])
-        canvas = group_priority | group_no_priority
-        canvas()
+        query_group()
