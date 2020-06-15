@@ -1,18 +1,23 @@
-import django
 import json
 import time
 
 from django.test import TestCase
-from django.urls import reverse
+try:
+    from django.urls import reverse
+except ImportError:
+    from django.core.urlresolvers import reverse
+
 from django.contrib.auth.models import User
-from django.conf import settings
+from explorer.app_settings import EXPLORER_DEFAULT_CONNECTION as CONN
 from django.forms.models import model_to_dict
+from django.db import connections
 
 from explorer.tests.factories import SimpleQueryFactory, QueryLogFactory
 from explorer.models import Query, QueryLog, MSG_FAILED_BLACKLIST
 from explorer.utils import user_can_see_query
 from explorer.app_settings import EXPLORER_TOKEN
 from mock import Mock, patch
+from django.core.cache import cache
 
 
 class TestQueryListView(TestCase):
@@ -75,6 +80,7 @@ class TestQueryCreateView(TestCase):
 
 
 class TestQueryDetailView(TestCase):
+    databases = ['default', 'alt']
 
     def setUp(self):
         self.user = User.objects.create_superuser('admin', 'admin@admin.com', 'pwd')
@@ -169,15 +175,15 @@ class TestQueryDetailView(TestCase):
     def test_user_query_views(self):
         request = Mock()
 
-        request.user.is_anonymous = Mock(return_value=True)
+        request.user.is_anonymous = True
         kwargs = {}
         self.assertFalse(user_can_see_query(request, **kwargs))
 
-        request.user.is_anonymous = Mock(return_value=True)
+        request.user.is_anonymous = True
         self.assertFalse(user_can_see_query(request, **kwargs))
 
         kwargs = {'query_id': 123}
-        request.user.is_anonymous = Mock(return_value=False)
+        request.user.is_anonymous = False
         self.assertFalse(user_can_see_query(request, **kwargs))
 
         request.user.id = 99
@@ -202,29 +208,46 @@ class TestQueryDetailView(TestCase):
         self.assertContains(resp, '2015-01-01')
         self.assertContains(resp, '2015-01-02')
 
-    @patch('explorer.models.get_connection')
-    def test_failing_blacklist_means_query_doesnt_execute(self, mocked_conn):
-        # I should really learn to set up mocks correctly because this CANT be the most efficient way...
-        cursor_result = Mock()
-        cursor_result.fetchall.return_value = []
-        cursor_result.description = [('foo', 'bar')]
-
-        conn = Mock()
-        conn.cursor.return_value = cursor_result
-        mocked_conn.return_value = conn
-
+    def test_failing_blacklist_means_query_doesnt_execute(self):
+        conn = connections[CONN]
+        start = len(conn.queries)
         query = SimpleQueryFactory(sql="select 1;")
         resp = self.client.post(reverse("query_detail", kwargs={'query_id': query.id}), data={'sql': "select 'delete';"})
+        end = len(conn.queries)
+
         self.assertTemplateUsed(resp, 'explorer/query.html')
         self.assertContains(resp, MSG_FAILED_BLACKLIST % '')
 
-        # Feels fragile, but nor sure how else to access the called-with params of .execute
-        self.assertEqual(conn.cursor.mock_calls[1][1][0], "select 1;")
+        self.assertEqual(start, end)
 
     def test_fullscreen(self):
         query = SimpleQueryFactory(sql="select 1;")
         resp = self.client.get(reverse("query_detail", kwargs={'query_id': query.id}) + '?fullscreen=1')
         self.assertTemplateUsed(resp, 'explorer/fullscreen.html')
+
+    def test_multiple_connections_integration(self):
+        from explorer.app_settings import EXPLORER_CONNECTIONS
+        from explorer.connections import connections
+
+        c1_alias = EXPLORER_CONNECTIONS['SQLite']
+        conn = connections[c1_alias]
+        c = conn.cursor()
+        c.execute('CREATE TABLE IF NOT EXISTS animals (name text NOT NULL);')
+        c.execute('INSERT INTO animals ( name ) VALUES (\'peacock\')')
+
+        c2_alias = EXPLORER_CONNECTIONS['Another']
+        conn = connections[c2_alias]
+        c = conn.cursor()
+        c.execute('CREATE TABLE IF NOT EXISTS animals (name text NOT NULL);')
+        c.execute('INSERT INTO animals ( name ) VALUES (\'superchicken\')')
+
+        query = SimpleQueryFactory(sql="select name from animals;", connection=c1_alias)
+        resp = self.client.get(reverse("query_detail", kwargs={'query_id': query.id}))
+        self.assertContains(resp, "peacock")
+
+        query = SimpleQueryFactory(sql="select name from animals;", connection=c2_alias)
+        resp = self.client.get(reverse("query_detail", kwargs={'query_id': query.id}))
+        self.assertContains(resp, "superchicken")
 
 
 class TestDownloadView(TestCase):
@@ -261,6 +284,14 @@ class TestDownloadView(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['content-type'], 'text/csv')
+
+    def test_bad_query_gives_500(self):
+        query = SimpleQueryFactory(sql='bad')
+        url = reverse("download_query", args=[query.pk]) + '?format=csv'
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 500)
 
     def test_download_json(self):
         query = SimpleQueryFactory()
@@ -361,6 +392,7 @@ class TestCSVFromSQL(TestCase):
 
 
 class TestSQLDownloadViews(TestCase):
+    databases = ['default', 'alt']
 
     def setUp(self):
         self.user = User.objects.create_superuser('admin', 'admin@admin.com', 'pwd')
@@ -373,6 +405,29 @@ class TestSQLDownloadViews(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['content-type'], 'text/csv')
+
+    def test_sql_download_respects_connection(self):
+        from explorer.app_settings import EXPLORER_CONNECTIONS
+        from explorer.connections import connections
+
+        c1_alias = EXPLORER_CONNECTIONS['SQLite']
+        conn = connections[c1_alias]
+        c = conn.cursor()
+        c.execute('CREATE TABLE IF NOT EXISTS animals (name text NOT NULL);')
+        c.execute('INSERT INTO animals ( name ) VALUES (\'peacock\')')
+
+        c2_alias = EXPLORER_CONNECTIONS['Another']
+        conn = connections[c2_alias]
+        c = conn.cursor()
+        c.execute('CREATE TABLE IF NOT EXISTS animals (name text NOT NULL);')
+        c.execute('INSERT INTO animals ( name ) VALUES (\'superchicken\')')
+
+        url = reverse("download_sql") + '?format=csv'
+
+        response = self.client.post(url, {'sql': 'select * from animals;', 'connection': c2_alias})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'superchicken')
 
     def test_sql_download_csv_with_custom_delim(self):
         url = reverse("download_sql") + '?format=csv&delim=|'
@@ -413,21 +468,35 @@ class TestSQLDownloadViews(TestCase):
 class TestSchemaView(TestCase):
 
     def setUp(self):
+        cache.clear()
         self.user = User.objects.create_superuser('admin', 'admin@admin.com', 'pwd')
         self.client.login(username='admin', password='pwd')
 
     def test_returns_schema_contents(self):
-        resp = self.client.get(reverse("explorer_schema"))
+        resp = self.client.get(reverse("explorer_schema", kwargs={'connection': CONN}))
         self.assertContains(resp, "explorer_query")
         self.assertTemplateUsed(resp, 'explorer/schema.html')
 
+    def test_returns_404_if_conn_doesnt_exist(self):
+        resp = self.client.get(reverse("explorer_schema", kwargs={'connection': 'foo'}))
+        self.assertEqual(resp.status_code, 404)
+
     def test_admin_required(self):
         self.client.logout()
-        resp = self.client.get(reverse("explorer_schema"))
+        resp = self.client.get(reverse("explorer_schema", kwargs={'connection': CONN}))
         self.assertTemplateUsed(resp, 'admin/login.html')
+
+    @patch('explorer.schema.do_async')
+    def test_builds_async(self, mocked_async_check):
+        mocked_async_check.return_value = True
+        resp = self.client.get(reverse("explorer_schema", kwargs={'connection': CONN}))
+        self.assertTemplateUsed(resp, 'explorer/schema_building.html')
+        resp = self.client.get(reverse("explorer_schema", kwargs={'connection': CONN}))
+        self.assertTemplateUsed(resp, 'explorer/schema.html')
 
 
 class TestFormat(TestCase):
+
     def setUp(self):
         self.user = User.objects.create_superuser('admin', 'admin@admin.com', 'pwd')
         self.client.login(username='admin', password='pwd')
@@ -468,20 +537,21 @@ class TestCreatedBy(TestCase):
         self.user = User.objects.create_superuser('admin', 'admin@admin.com', 'pwd')
         self.user2 = User.objects.create_superuser('admin2', 'admin2@admin.com', 'pwd')
         self.client.login(username='admin', password='pwd')
-        self.query = SimpleQueryFactory.build()
+        self.query = SimpleQueryFactory.build(created_by_user=self.user)
         self.data = model_to_dict(self.query)
-        self.data["created_by_user"] = 2
+        del self.data['id']
+        self.data["created_by_user_id"] = self.user2.id
 
     def test_query_update_doesnt_change_created_user(self):
         self.query.save()
         self.client.post(reverse("query_detail", kwargs={'query_id': self.query.id}), self.data)
         q = Query.objects.get(id=self.query.id)
-        self.assertEqual(q.created_by_user_id, 1)
+        self.assertEqual(q.created_by_user_id, self.user.id)
 
     def test_new_query_gets_created_by_logged_in_user(self):
         self.client.post(reverse("query_create"), self.data)
         q = Query.objects.first()
-        self.assertEqual(q.created_by_user_id, 1)
+        self.assertEqual(q.created_by_user_id, self.user.id)
 
 
 class TestQueryLog(TestCase):

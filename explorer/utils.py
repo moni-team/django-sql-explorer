@@ -4,27 +4,23 @@ import re
 import zipfile
 from io import BytesIO
 
-from django.db import connections, connection
-
+from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.views import LoginView
+from django.contrib.auth import REDIRECT_FIELD_NAME
 from six import text_type
-
 import sqlparse
 
-from . import app_settings
+from explorer import app_settings
 
 EXPLORER_PARAM_TOKEN = "$$"
 
-# SQL Specific Things
-
 
 def passes_blacklist(sql):
-    clean = functools.reduce(lambda sql, term: sql.upper().replace(term, ""), [t.upper() for t in app_settings.EXPLORER_SQL_WHITELIST], sql)
-    fails = [bl_word for bl_word in app_settings.EXPLORER_SQL_BLACKLIST if bl_word in clean.upper()]
+    clean = functools.reduce(lambda sql, term: sql.upper().replace(term, ""), [
+                             t.upper() for t in app_settings.EXPLORER_SQL_WHITELIST], sql)
+    fails = [
+        bl_word for bl_word in app_settings.EXPLORER_SQL_BLACKLIST if bl_word in clean.upper()]
     return not any(fails), fails
-
-
-def get_connection():
-    return connections[app_settings.EXPLORER_CONNECTION_NAME] if app_settings.EXPLORER_CONNECTION_NAME else connection
 
 
 def _format_field(field):
@@ -46,14 +42,7 @@ def swap_params(sql, params):
 def extract_params(text):
     regex = re.compile("\$\$([a-z0-9_]+)(?:\:([^\$]+))?\$\$")
     params = re.findall(regex, text.lower())
-    # We support Python 2.6 so can't use a dict comprehension
-    return dict(list(zip([p[0] for p in params], [p[1] if len(p) > 1 else '' for p in params])))
-
-
-# Helpers
-from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth import login
-from django.contrib.auth import REDIRECT_FIELD_NAME
+    return {p[0]: p[1] if len(p) > 1 else '' for p in params}
 
 
 def safe_login_prompt(request):
@@ -66,7 +55,7 @@ def safe_login_prompt(request):
             REDIRECT_FIELD_NAME: request.get_full_path(),
         },
     }
-    return login(request, **defaults)
+    return LoginView.as_view(**defaults)(request)
 
 
 def shared_dict_update(target, source):
@@ -135,7 +124,12 @@ def allowed_query_pks(user_id):
 
 
 def user_can_see_query(request, **kwargs):
-    if not request.user.is_anonymous and 'query_id' in kwargs:
+    # In Django<1.10, is_anonymous was a method.
+    try:
+        is_anonymous = request.user.is_anonymous()
+    except TypeError:
+        is_anonymous = request.user.is_anonymous
+    if not is_anonymous and 'query_id' in kwargs:
         return int(kwargs['query_id']) in allowed_query_pks(request.user.id)
     return False
 
@@ -146,6 +140,23 @@ def fmt_sql(sql):
 
 def noop_decorator(f):
     return f
+
+
+class InvalidExplorerConnectionException(Exception):
+    pass
+
+
+def get_valid_connection(alias=None):
+    from explorer.connections import connections
+
+    if not alias:
+        return connections[app_settings.EXPLORER_DEFAULT_CONNECTION]
+
+    if alias not in connections:
+        raise InvalidExplorerConnectionException(
+            'Attempted to access connection %s, but that is not a registered Explorer connection.' % alias
+        )
+    return connections[alias]
 
 
 def get_s3_bucket():

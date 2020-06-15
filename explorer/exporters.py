@@ -1,15 +1,16 @@
+from six import StringIO, BytesIO
+from explorer import app_settings
+from django.utils.text import slugify
 from datetime import datetime
 import json
-from six import StringIO, BytesIO
+import uuid
 import string
 import sys
 
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import DatabaseError
 from django.utils.module_loading import import_string
 from unidecode import unidecode
 
-from . import app_settings
 PY3 = sys.version_info[0] == 3
 if PY3:
     import csv
@@ -39,11 +40,8 @@ class BaseExporter(object):
             return str(value)
 
     def get_file_output(self, **kwargs):
-        try:
-            res = self.query.execute_query_only()
-            return self._get_output(res, **kwargs)
-        except DatabaseError as e:
-            return StringIO(str(e))
+        res = self.query.execute_query_only()
+        return self._get_output(res, **kwargs)
 
     def _get_output(self, res, **kwargs):
         """
@@ -95,7 +93,8 @@ class JSONExporter(BaseExporter):
         data = []
         for row in res.data:
             data.append(
-                dict(list(zip([str(h) if h is not None else '' for h in res.headers], row)))
+                dict(
+                    list(zip([str(h) if h is not None else '' for h in res.headers], row)))
             )
 
         json_data = json.dumps(data, cls=DjangoJSONEncoder)
@@ -112,13 +111,9 @@ class ExcelExporter(BaseExporter):
         import xlsxwriter
         output = BytesIO()
 
-        wb = xlsxwriter.Workbook(output)
+        wb = xlsxwriter.Workbook(output, {'in_memory': True})
 
-        # XLSX writer wont allow sheet names > 31 characters
-        # https://github.com/jmcnamara/XlsxWriter/blob/master/xlsxwriter/test/workbook/test_check_sheetname.py
-        title = self.query.title[:31]
-
-        ws = wb.add_worksheet(name=title)
+        ws = wb.add_worksheet(name=self._format_title())
 
         # Write headers
         row = 0
@@ -133,8 +128,10 @@ class ExcelExporter(BaseExporter):
         col = 0
         for data_row in res.data:
             for data in data_row:
-                # xlsxwriter can't handle timezone-aware datetimes, so we help out here and just cast it to a string
-                if isinstance(data, datetime):
+                # xlsxwriter can't handle timezone-aware datetimes or
+                # UUIDs, so we help out here and just cast it to a
+                # string
+                if isinstance(data, datetime) or isinstance(data, uuid.UUID):
                     data = str(data)
                 # JSON and Array fields
                 if isinstance(data, dict) or isinstance(data, list):
@@ -147,21 +144,8 @@ class ExcelExporter(BaseExporter):
         wb.close()
         return output
 
-
-class PdfExporter(BaseExporter):
-
-    name = 'PDF'
-    content_type = 'application/pdf'
-    file_extension = '.pdf'
-
-    def _get_output(self, res, **kwargs):
-        from django_xhtml2pdf.utils import generate_pdf
-        output = BytesIO()
-        
-        ctx = {
-            'headers': res.header_strings,
-            'data': res.data,
-        }
-        result = generate_pdf('explorer/pdf_template.html', file_object=output, context=ctx)
-        return output
-
+    def _format_title(self):
+        # XLSX writer wont allow sheet names > 31 characters or that contain invalid characters
+        # https://github.com/jmcnamara/XlsxWriter/blob/master/xlsxwriter/test/workbook/test_check_sheetname.py
+        title = slugify(self.query.title)
+        return title[:31]

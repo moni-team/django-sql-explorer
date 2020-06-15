@@ -1,7 +1,7 @@
 __version_info__ = {
     'major': 1,
     'minor': 1,
-    'micro': 1,
+    'micro': 3,
     'releaselevel': 'final',
     'serial': 0
 }
@@ -17,3 +17,5 @@ def get_version(short=False):
     return ''.join(vers)
 
 __version__ = get_version()
+
+default_app_config = 'explorer.apps.ExplorerAppConfig'

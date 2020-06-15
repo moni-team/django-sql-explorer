@@ -1,5 +1,6 @@
+
 {% extends "explorer/base.html" %}
-{% load staticfiles %}
+{% load static %}
 
 {% block sql_explorer_navlinks %}
     {% if can_change %}
@@ -11,7 +12,7 @@
 
 {% block sql_explorer_content %}
     {% if recent_queries|length > 0 %}
-        <h3>{{ recent_queries|length }} Most Recently Used</h3>
+        <h3>Your {{ recent_queries|length }} Most Recently Run</h3>
         <table class="table table-striped">
             <thead>
                 <tr>
@@ -23,10 +24,10 @@
             <tbody>
                 {% for object in recent_queries %}
                 <tr>
-                    <td class="name"><a href="{% url "query_detail" object.id %}">{{ object.title }}</a></td>
-                    <td>{{ object.last_run_date|date:"SHORT_DATETIME_FORMAT" }}</td>
+                    <td class="name"><a href="{% url "query_detail" object.query_id %}">{{ object.query.title }}</a></td>
+                    <td>{{ object.run_at|date:"SHORT_DATETIME_FORMAT" }}</td>
                     <td class="text-center">
-                        <a href="{% url "download_query" object.id %}"><i class="glyphicon glyphicon-download"></i></a>
+                        <a href="{% url "download_query" object.query_id %}"><i class="glyphicon glyphicon-download"></i></a>
                     </td>
                 </tr>
                 {% endfor %}
@@ -80,18 +81,18 @@
                         {% endif %}
                     </td>
                     {% if tasks_enabled %}
-                      <td class="text-center">
+                      <td>
                           <a class="email-csv" data-id="{{ object.id }}" href="{% url "email_csv_query" object.id %}"><i class="glyphicon glyphicon-envelope"></i></a>
                       </td>
                     {% endif %}
-                    <td class="text-center">
+                    <td>
                         <a href="{% url "download_query" object.id %}"><i class="glyphicon glyphicon-download"></i></a>
                     </td>
                     {% if can_change %}
-                        <td class="text-center">
+                        <td>
                             <a href="{% url "explorer_playground" %}?query_id={{ object.id }}"><i class="glyphicon glyphicon-new-window"></i></a>
                         </td>
-                        <td class="text-center">
+                        <td>
                             <a href="{% url "query_delete" object.id %}"><i class="glyphicon glyphicon-trash"></i></a>
                         </td>
                     {% endif %}

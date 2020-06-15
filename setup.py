@@ -10,6 +10,7 @@ from setuptools import setup
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
+
 setup(
     name="django-sql-explorer-moni",
     version='moni_version',
@@ -23,11 +24,24 @@ setup(
     packages=['explorer'],
     long_description=read('README.rst'),
     classifiers=[
+        'Development Status :: 5 - Production/Stable',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: MIT License',
+        'Topic :: Utilities',
         'Framework :: Django :: 1.10',
+        'Framework :: Django :: 1.11',
+        'Framework :: Django :: 2.0',
+        'Framework :: Django :: 2.1',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
     install_requires=[
-        'Django>=1.7.0',
+        'Django>=2.2,<=3.0.5',
         'sqlparse>=0.1.18',
         'unicodecsv>=0.14.1',
         'six>=1.10.0',
